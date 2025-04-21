@@ -111,7 +111,7 @@ public class ShadowHideManager : MonoBehaviour
     /// 凸包の頂点を計算
     /// </summary>
     /// <returns>凸包を構成する頂点の配列（反時計回り順）</returns>
-    public static Vector3[] FindConvexHull(Vector3[] inputVertices)
+    private Vector3[] FindConvexHull(Vector3[] inputVertices)
     {
         // 各x成分とz成分のベクトルとして変換
         List<Vector2> points2D = new List<Vector2>();
@@ -130,14 +130,12 @@ public class ShadowHideManager : MonoBehaviour
         });
 
         List<Vector2> hull2D = new List<Vector2>();
-        
+
         // 下側凸包の構築
         foreach (Vector2 p in points2D)
         {
-            // Monotone Chain (Andrew's Algorithm) を使用して凸包を構築
+            // Monotone Chain を使用して凸包を構築
             // 直前の2点と現在の点が右回り、または同一直線上にある間は、直前の点を凸包から取り除く
-            // Orientation <= 0 は、時計回りか同一直線上を意味する。
-            // これにより、内側にある点や同一直線上の途中の点が排除され、凸包の角となる頂点のみが残る。
             while (hull2D.Count >= 2 && Orientation(hull2D[hull2D.Count - 2], hull2D[hull2D.Count - 1], p) <= 0)
             {
                 hull2D.RemoveAt(hull2D.Count - 1);
@@ -147,15 +145,12 @@ public class ShadowHideManager : MonoBehaviour
 
         // 上側凸包の構築
         // ソートされた点を逆順に処理
-        int lowerHullCount = hull2D.Count; // 下側凸包に追加された点の数を覚えておく
+        int lowerHullCount = hull2D.Count;
         // 最右端の点 (points2D.Count - 1) は下側凸包の終点として既に含まれているため、上側凸包の開始点からは除外
         // 最左端の点 (points2D[0]) は上側凸包の終点となるため、ループ範囲に含める
         for (int i = points2D.Count - 2; i >= 0; i--)
         {
             Vector2 p = points2D[i];
-            // 直前の2点と現在の点が右回り、または同一直線上にある間は、直前の点を凸包から取り除く
-            // Orientation <= 0 は、時計回りか同一直線上を意味する。
-            // (点を逆順に見ているため、元の順序では反時計回りか同一直線上に対応)
             while (hull2D.Count >= lowerHullCount && Orientation(hull2D[hull2D.Count - 2], hull2D[hull2D.Count - 1], p) <= 0)
             {
                 hull2D.RemoveAt(hull2D.Count - 1);
@@ -165,19 +160,12 @@ public class ShadowHideManager : MonoBehaviour
 
         // hull2Dの最後の点は最初の点と同じ（最左端の点）であるため、重複を削除する
         // ただし、計算結果が1点しかない場合は削除しない (全ての点が同一直線上にある極端な場合など)
-        if (hull2D.Count > 1)
-        {
-            hull2D.RemoveAt(hull2D.Count - 1);
-        }
-
+        if (hull2D.Count > 1) hull2D.RemoveAt(hull2D.Count - 1);
 
         // 計算された2D凸包の点をVector3 (x, 0, z) に戻す
         Vector3[] outlineVertices = new Vector3[hull2D.Count];
-        for (int i = 0; i < hull2D.Count; i++)
-        {
-            outlineVertices[i] = new Vector3(hull2D[i].x, 0, hull2D[i].y); // Vector2のyは元のVector3のz
-        }
-
+        for (int i = 0; i < hull2D.Count; i++) outlineVertices[i] = new Vector3(hull2D[i].x, 0, hull2D[i].y);
+        
         return outlineVertices;
     }
 
@@ -185,33 +173,23 @@ public class ShadowHideManager : MonoBehaviour
     /// 3つの2D点 p1, p2, p3 の向きを判定するヘルパー関数。
     /// XZ平面上の点に対するクロス積のZ成分に相当。
     /// </summary>
-    /// <returns>
-    /// > 0 : 反時計回り (左回り)
-    /// < 0 : 時計回り (右回り)
-    /// = 0 : 同一直線上
-    /// </returns>
-    private static float Orientation(Vector2 p1, Vector2 p2, Vector2 p3)
+    /// <returns> 正: 反時計回り (左回り) 負: 時計回り (右回り) 0: 同一直線上 </returns>
+    private float Orientation(Vector2 p1, Vector2 p2, Vector2 p3)
     {
-        // (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x)
         return (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x);
     }
 
     /// <summary>
-    /// 指定された点が、与えられた凸包の内部または境界上にあるかを判定します。
-    /// 点および凸包の頂点のy座標は0である必要があります (XZ平面上での判定)。
-    /// 凸包の頂点は反時計回りの順序で与えられていることを想定しています。
+    /// 与えられた点が凸包の内部にあるか判定
     /// </summary>
-    /// <param name="pointToCheck">判定したい点 (y座標は0)</param>
-    /// <param name="convexHullVertices">凸包を構成する頂点の配列 (y座標は0, 反時計回り順)。FindConvexHullの戻り値など。</param>
-    /// <returns>点が凸包の内部または境界上にあれば true、そうでなければ false。</returns>
-    public static bool IsPointInside(Vector3 pointToCheck, Vector3[] convexHullVertices)
+    /// <returns>内部または境界上: true でなければ: false</returns>
+    private bool IsPointInside(Vector3 pointToCheck, Vector3[] convexHullVertices)
     {
         // 3点以上の凸多角形の場合: 各辺に対して点が同じ側にあるか判定
-        // 凸包頂点が FindConvexHull により反時計回り順で与えられていることを前提とする
+        // 凸包頂点が反時計回り順で与えられていることを前提とする
         Vector2 point_2D = new Vector2(pointToCheck.x, pointToCheck.z);
 
-        // 凸多角形の場合、点が全ての辺に対して「左側または線上」にあれば内部または境界上。
-        // 一つでも「右側」にあれば外部。
+        // 点が全ての辺に対して左または線上にあれば内部または境界上
         for (int i = 0; i < convexHullVertices.Length; i++)
         {
             Vector2 p1_2D = new Vector2(convexHullVertices[i].x, convexHullVertices[i].z);
@@ -219,18 +197,12 @@ public class ShadowHideManager : MonoBehaviour
             Vector2 p2_2D = new Vector2(convexHullVertices[(i + 1) % convexHullVertices.Length].x, convexHullVertices[(i + 1) % convexHullVertices.Length].z);
 
             // 辺 (p1_2D -> p2_2D) に対して、点が左側または線上にあるか判定
-            // Orientation(p1, p2, point) の結果:
-            // > 0: 反時計回り (左側)
-            // = 0: 同一直線上
-            // < 0: 時計回り (右側)
-            // 反時計回りの凸包では、点が全ての辺に対して時計回りにならない (つまり Orientation >= 0) 必要がある。
+            // 点が全ての辺に対して以下の関数が正にならないといけない
             if (Orientation(p1_2D, p2_2D, point_2D) < 0)
             {
-                return false; // 一つでも右側にあれば凸包の外
+                return false; // 一つでも右側にあれば外部
             }
         }
-
-        // 全ての辺に対して左側または線上にあれば、凸包の内部または境界上
         return true;
     }
 }
