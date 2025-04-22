@@ -4,8 +4,8 @@ using UnityEngine;
 
 public class ShadowHideManager : MonoBehaviour
 {
-    public GameObject targetObj;
-    public Light SceneLight;
+    public GameObject Caster;
+    public Light Light;
 
     /// <summary>
     /// 光源の角度
@@ -13,9 +13,9 @@ public class ShadowHideManager : MonoBehaviour
     private Vector3 lightAngles;
 
     /// <summary>
-    /// 対象オブジェクトの頂点
+    /// 影を落とす物体の頂点
     /// </summary>
-    private List<Vector3> targetVertices;
+    private List<Vector3> casterVertices;
 
     /// <summary>
     /// 頂点の相対座標
@@ -33,75 +33,90 @@ public class ShadowHideManager : MonoBehaviour
     private Vector3[] convexVertices;
 
     /// <summary>
-    /// 対象オブジェクトの座標の一時保存用
+    /// 影を落とす物体の座標の一時保存用
     /// </summary>
-    private Vector3 targetCastVector;
+    private Vector3 casterTempVector;
 
     /// <summary>
-    /// 対象オブジェクトの回転の一時保存用
+    /// 影を落とす物体の回転の一時保存用
     /// </summary>
-    private Quaternion targetCastQuaternion;
+    private Quaternion casterTempQuaternion;
 
-    private Vector3 groundPos;
+    private Vector3 targetPos;
 
+    /// <summary>
+    /// 影に隠れているか
+    /// </summary>
     private bool isHide;
+    private bool tempIsHide;
 
-    private void Start() {
-        lightAngles = SceneLight.transform.forward;
-        groundPos = new Vector3(0f, 0,0f);
+    private void Start()
+    {
+        lightAngles = Light.transform.forward;
+        targetPos = new Vector3(0f, 0, 0f);
 
         // 頂点情報取得
-        targetVertices = targetObj.GetComponent<MeshFilter>().mesh.vertices.ToList().Distinct().ToList();
-        initVertices = targetVertices.ToArray();
+        casterVertices = Caster.GetComponent<MeshFilter>().mesh.vertices.ToList().Distinct().ToList();
+        initVertices = casterVertices.ToArray();
 
-        shadowVertices = new Vector3[targetVertices.Count];
-
-        targetCastVector = targetObj.transform.position;
-        targetCastQuaternion = targetObj.transform.rotation;
+        shadowVertices = new Vector3[casterVertices.Count];
+        casterTempVector = Caster.transform.position;
+        casterTempQuaternion = Caster.transform.rotation;
     }
 
     private void Update()
     {
-        // 座標変更時に処理
-        if (targetCastVector != targetObj.transform.position ||
-                targetCastQuaternion != targetObj.transform.rotation || Time.frameCount == 1) {
-            targetVertices = UpdateVertices(targetVertices);
+        // 座標変更時に物体・影の頂点座標を更新
+        if (casterTempVector != Caster.transform.position ||
+                casterTempQuaternion != Caster.transform.rotation || Time.frameCount == 1) {
+            casterVertices = UpdateVertices(casterVertices);
+            shadowVertices = UpdateShadowVertices(casterVertices);
+    
+            casterTempVector = Caster.transform.position;
+            casterTempQuaternion = Caster.transform.rotation;
         }
-        
-        // 影の頂点座標を更新
-        shadowVertices = UpdateShadowVertices(targetVertices);
 
         // 凸包を求める
         convexVertices = FindConvexHull(shadowVertices);
-        
-        // 内外判定
-        isHide = IsPointInside(groundPos, convexVertices);
+        for (int i = 0; i < convexVertices.Length; i++)
+        {
+            Debug.DrawLine(targetPos, convexVertices[i], Color.green);
+        }
 
-        print(isHide);
+        // 内外判定
+        isHide = IsPointInside(targetPos, convexVertices);
+
+        if (tempIsHide != isHide || Time.frameCount == 1) {
+            print(isHide);
+            tempIsHide = isHide;
+        }
     }
 
     /// <summary>
     /// 対象オブジェクトの頂点座標を更新
     /// </summary>
-    private List<Vector3> UpdateVertices(List<Vector3> Vertices) {
-        for (int i = 0; i < Vertices.Count; i++) {
-            Vertices[i] = targetObj.transform.position +  initVertices[i];
+    private List<Vector3> UpdateVertices(List<Vector3> Vertices)
+    {
+        for (int i = 0; i < Vertices.Count; i++)
+        {
+            Vertices[i] = Caster.transform.position + initVertices[i];
         }
-        targetCastVector = targetObj.transform.position;
-        targetCastQuaternion = targetObj.transform.rotation;
         return Vertices;
     }
 
     /// <summary>
     /// 影の頂点座標を更新
     /// </summary>
-    private Vector3[] UpdateShadowVertices(List<Vector3> Vertices) {
+    private Vector3[] UpdateShadowVertices(List<Vector3> Vertices)
+    {
         Vector3[] hitPoints = new Vector3[Vertices.Count];
-        for (int i = 0; i < Vertices.Count; i++) {
+        for (int i = 0; i < Vertices.Count; i++)
+        {
             RaycastHit hit;
-            if(Physics.Raycast(Vertices[i], lightAngles, out hit)) {
+            if (Physics.Raycast(Vertices[i], lightAngles, out hit))
+            {
                 hitPoints[i] = hit.point;
-                Debug.DrawLine(Vertices[i], hitPoints[i], Color.red);    
+                Debug.DrawLine(Vertices[i], hitPoints[i], Color.red);
             }
         }
         return hitPoints;
@@ -124,7 +139,7 @@ public class ShadowHideManager : MonoBehaviour
             int compareX = a.x.CompareTo(b.x);
             if (compareX == 0)
             {
-                return a.y.CompareTo(b.y); // Vector2のyは元のVector3のz
+                return a.y.CompareTo(b.y);
             }
             return compareX;
         });
@@ -165,7 +180,7 @@ public class ShadowHideManager : MonoBehaviour
         // 計算された2D凸包の点をVector3 (x, 0, z) に戻す
         Vector3[] outlineVertices = new Vector3[hull2D.Count];
         for (int i = 0; i < hull2D.Count; i++) outlineVertices[i] = new Vector3(hull2D[i].x, 0, hull2D[i].y);
-        
+
         return outlineVertices;
     }
 
