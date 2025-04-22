@@ -170,8 +170,7 @@ public class ShadowHideManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 3つの2D点 p1, p2, p3 の向きを判定するヘルパー関数。
-    /// XZ平面上の点に対するクロス積のZ成分に相当。
+    /// p1からp2、p1からp3に向かうベクトル同士の外積を求める
     /// </summary>
     /// <returns> 正: 反時計回り (左回り) 負: 時計回り (右回り) 0: 同一直線上 </returns>
     private float Orientation(Vector2 p1, Vector2 p2, Vector2 p3)
@@ -185,7 +184,6 @@ public class ShadowHideManager : MonoBehaviour
     /// <returns>内部または境界上: true でなければ: false</returns>
     private bool IsPointInside(Vector3 pointToCheck, Vector3[] convexHullVertices)
     {
-        // 3点以上の凸多角形の場合: 各辺に対して点が同じ側にあるか判定
         // 凸包頂点が反時計回り順で与えられていることを前提とする
         Vector2 point_2D = new Vector2(pointToCheck.x, pointToCheck.z);
 
@@ -196,8 +194,7 @@ public class ShadowHideManager : MonoBehaviour
             // 次の頂点へ (末尾の場合は最初に戻る)
             Vector2 p2_2D = new Vector2(convexHullVertices[(i + 1) % convexHullVertices.Length].x, convexHullVertices[(i + 1) % convexHullVertices.Length].z);
 
-            // 辺 (p1_2D -> p2_2D) に対して、点が左側または線上にあるか判定
-            // 点が全ての辺に対して以下の関数が正にならないといけない
+            // 2点からなる辺に対し、点の位置を判定
             if (Orientation(p1_2D, p2_2D, point_2D) < 0)
             {
                 return false; // 一つでも右側にあれば外部
