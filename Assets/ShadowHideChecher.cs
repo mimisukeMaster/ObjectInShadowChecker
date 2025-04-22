@@ -6,6 +6,7 @@ public class ShadowHideManager : MonoBehaviour
 {
     public GameObject Caster;
     public Light Light;
+    public GameObject Target;
 
     /// <summary>
     /// 光源の角度
@@ -15,7 +16,7 @@ public class ShadowHideManager : MonoBehaviour
     /// <summary>
     /// 影を落とす物体の頂点
     /// </summary>
-    private List<Vector3> casterVertices;
+    private Vector3[] casterVertices;
 
     /// <summary>
     /// 頂点の相対座標
@@ -42,62 +43,68 @@ public class ShadowHideManager : MonoBehaviour
     /// </summary>
     private Quaternion casterTempQuaternion;
 
-    private Vector3 targetPos;
+    /// <summary>
+    /// ターゲットのオブジェクトの頂点
+    /// </summary>
+    private Vector3[] targetVertices;
 
     /// <summary>
     /// 影に隠れているか
     /// </summary>
     private bool isHide;
-    private bool tempIsHide;
 
     private void Start()
     {
         lightAngles = Light.transform.forward;
-        targetPos = new Vector3(0f, 0, 0f);
 
-        // 頂点情報取得
-        casterVertices = Caster.GetComponent<MeshFilter>().mesh.vertices.ToList().Distinct().ToList();
-        initVertices = casterVertices.ToArray();
+        // 影を落とす物体の頂点情報（相対座標）取得
+        casterVertices = Caster.GetComponent<MeshFilter>().mesh.vertices.ToArray().Distinct().ToArray();
+        // 各頂点の相対座標を保存
+        initVertices = new Vector3[casterVertices.Length];
+        for (int i = 0; i < casterVertices.Length; i++) initVertices[i] = casterVertices[i];
 
-        shadowVertices = new Vector3[casterVertices.Count];
+        // ターゲットの頂点情報を取得し絶対座標に修正
+        targetVertices = Target.GetComponent<MeshFilter>().mesh.vertices.ToArray().Distinct().ToArray();
+        for (int i = 0; i < targetVertices.Length; i++) {
+            targetVertices[i] += Target.transform.position;
+        }
+        
+        shadowVertices = new Vector3[casterVertices.Length];
+
         casterTempVector = Caster.transform.position;
         casterTempQuaternion = Caster.transform.rotation;
     }
 
     private void Update()
     {
-        // 座標変更時に物体・影の頂点座標を更新
-        if (casterTempVector != Caster.transform.position ||
-                casterTempQuaternion != Caster.transform.rotation || Time.frameCount == 1) {
-            casterVertices = UpdateVertices(casterVertices);
-            shadowVertices = UpdateShadowVertices(casterVertices);
-    
-            casterTempVector = Caster.transform.position;
-            casterTempQuaternion = Caster.transform.rotation;
-        }
+        // 座標・回転変更時でなければ何もしない
+        if (casterTempVector == Caster.transform.position &&
+                casterTempQuaternion == Caster.transform.rotation && Time.frameCount != 1) return;
+        
+        // 影を落とす物体の頂点座標を更新
+        casterVertices = UpdateVertices(casterVertices);
+
+        // 影の頂点座標を更新
+        shadowVertices = UpdateShadowVertices(casterVertices);
 
         // 凸包を求める
         convexVertices = FindConvexHull(shadowVertices);
-        for (int i = 0; i < convexVertices.Length; i++)
-        {
-            Debug.DrawLine(targetPos, convexVertices[i], Color.green);
-        }
 
         // 内外判定
-        isHide = IsPointInside(targetPos, convexVertices);
+        isHide = IsVerticesInside(targetVertices, convexVertices);
 
-        if (tempIsHide != isHide || Time.frameCount == 1) {
-            print(isHide);
-            tempIsHide = isHide;
-        }
+        print(isHide);
+
+        casterTempVector = Caster.transform.position;
+        casterTempQuaternion = Caster.transform.rotation;
     }
 
     /// <summary>
-    /// 対象オブジェクトの頂点座標を更新
+    /// 影を落とす物体の頂点座標を更新
     /// </summary>
-    private List<Vector3> UpdateVertices(List<Vector3> Vertices)
+    private Vector3[] UpdateVertices(Vector3[] Vertices)
     {
-        for (int i = 0; i < Vertices.Count; i++)
+        for (int i = 0; i < Vertices.Length; i++)
         {
             Vertices[i] = Caster.transform.position + initVertices[i];
         }
@@ -107,17 +114,13 @@ public class ShadowHideManager : MonoBehaviour
     /// <summary>
     /// 影の頂点座標を更新
     /// </summary>
-    private Vector3[] UpdateShadowVertices(List<Vector3> Vertices)
+    private Vector3[] UpdateShadowVertices(Vector3[] Vertices)
     {
-        Vector3[] hitPoints = new Vector3[Vertices.Count];
-        for (int i = 0; i < Vertices.Count; i++)
+        Vector3[] hitPoints = new Vector3[Vertices.Length];
+        for (int i = 0; i < Vertices.Length; i++)
         {
             RaycastHit hit;
-            if (Physics.Raycast(Vertices[i], lightAngles, out hit))
-            {
-                hitPoints[i] = hit.point;
-                Debug.DrawLine(Vertices[i], hitPoints[i], Color.red);
-            }
+            if (Physics.Raycast(Vertices[i], lightAngles, out hit)) hitPoints[i] = hit.point;
         }
         return hitPoints;
     }
@@ -185,12 +188,17 @@ public class ShadowHideManager : MonoBehaviour
     }
 
     /// <summary>
-    /// p1からp2、p1からp3に向かうベクトル同士の外積を求める
+    /// 各頂点に対して内外判定を実行
     /// </summary>
-    /// <returns> 正: 反時計回り (左回り) 負: 時計回り (右回り) 0: 同一直線上 </returns>
-    private float Orientation(Vector2 p1, Vector2 p2, Vector2 p3)
+    /// <returns>全て内部なら: true でなければ: false</returns>
+    private bool IsVerticesInside(Vector3[] verticesToCheck, Vector3[] convexVertices)
     {
-        return (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x);
+        bool isInside;
+        for (int i = 0; i < verticesToCheck.Length; i++) {
+            isInside = IsPointInside(verticesToCheck[i], convexVertices);
+            if (!isInside) return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -199,7 +207,6 @@ public class ShadowHideManager : MonoBehaviour
     /// <returns>内部または境界上: true でなければ: false</returns>
     private bool IsPointInside(Vector3 pointToCheck, Vector3[] convexHullVertices)
     {
-        // 凸包頂点が反時計回り順で与えられていることを前提とする
         Vector2 point_2D = new Vector2(pointToCheck.x, pointToCheck.z);
 
         // 点が全ての辺に対して左または線上にあれば内部または境界上
@@ -216,5 +223,14 @@ public class ShadowHideManager : MonoBehaviour
             }
         }
         return true;
+    }
+
+    /// <summary>
+    /// p1からp2、p1からp3に向かうベクトル同士の外積を求める
+    /// </summary>
+    /// <returns> 正: 反時計回り (左回り) 負: 時計回り (右回り) 0: 同一直線上 </returns>
+    private float Orientation(Vector2 p1, Vector2 p2, Vector2 p3)
+    {
+        return (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x);
     }
 }
