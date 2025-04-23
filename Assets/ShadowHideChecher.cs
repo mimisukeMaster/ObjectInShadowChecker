@@ -19,11 +19,6 @@ public class ShadowHideManager : MonoBehaviour
     private Vector3[] casterVertices;
 
     /// <summary>
-    /// 頂点の相対座標
-    /// </summary>
-    private Vector3[] initVertices;
-
-    /// <summary>
     /// 計算される影の頂点
     /// </summary>
     private Vector3[] shadowVertices;
@@ -44,6 +39,11 @@ public class ShadowHideManager : MonoBehaviour
     private Quaternion casterTempQuaternion;
 
     /// <summary>
+    /// 影を落とす物体の頂点座標の変換行列の一時保存用
+    /// </summary>
+    private Matrix4x4 casterTempMatrix;
+
+    /// <summary>
     /// ターゲットのオブジェクトの頂点
     /// </summary>
     private Vector3[] targetVertices;
@@ -57,38 +57,41 @@ public class ShadowHideManager : MonoBehaviour
     {
         lightAngles = Light.transform.forward;
 
-        // 影を落とす物体の頂点情報（相対座標）取得
-        casterVertices = Caster.GetComponent<MeshFilter>().mesh.vertices.Distinct().ToArray();
-        // 各頂点の相対座標を保存
-        initVertices = new Vector3[casterVertices.Length];
-        for (int i = 0; i < casterVertices.Length; i++) initVertices[i] = casterVertices[i];
-
-        // ターゲットの頂点情報を取得し絶対座標に修正
-        targetVertices = Target.GetComponent<MeshFilter>().mesh.vertices.Distinct().ToArray();
-        for (int i = 0; i < targetVertices.Length; i++) {
-            targetVertices[i] += Target.transform.position;
-        }
+        // 影を落とす物体の頂点を取得
+        casterVertices = GetMeshVertices(Caster);
         
+        // ターゲットの頂点を取得
+        targetVertices = GetMeshVertices(Target);
+
         shadowVertices = new Vector3[casterVertices.Length];
 
         casterTempVector = Caster.transform.position;
         casterTempQuaternion = Caster.transform.rotation;
+        casterTempMatrix = Caster.transform.localToWorldMatrix;
     }
 
     private void Update()
     {
         // 座標・回転変更時でなければ何もしない
         if (casterTempVector == Caster.transform.position &&
-                casterTempQuaternion == Caster.transform.rotation && Time.frameCount != 1) return;
+                casterTempQuaternion == Caster.transform.rotation || Time.frameCount == 1) return;
         
         // 影を落とす物体の頂点座標を更新
-        casterVertices = UpdateVertices(casterVertices);
-
+        casterVertices = UpdateVertices(Caster, casterVertices, casterTempMatrix);
+        for (int i = 0; i < casterVertices.Length -1; i++){
+            Debug.DrawLine(casterVertices[i], casterVertices[i+1], Color.cyan);
+        }
         // 影の頂点座標を更新
         shadowVertices = UpdateShadowVertices(casterVertices);
+        for (int i = 0; i < shadowVertices.Length -1; i++){
+            Debug.DrawLine(shadowVertices[i], shadowVertices[i+1], Color.red);
+        }
 
         // 凸包を求める
         convexVertices = FindConvexHull(shadowVertices);
+        for (int i = 0; i < convexVertices.Length -1; i++){
+            Debug.DrawLine(convexVertices[i], convexVertices[i+1], Color.green);
+        }
 
         // 内外判定
         isHide = IsVerticesInside(targetVertices, convexVertices);
@@ -97,30 +100,49 @@ public class ShadowHideManager : MonoBehaviour
 
         casterTempVector = Caster.transform.position;
         casterTempQuaternion = Caster.transform.rotation;
+        casterTempMatrix = Caster.transform.localToWorldMatrix;
     }
 
     /// <summary>
-    /// 影を落とす物体の頂点座標を更新
+    /// オブジェクトの頂点のグローバル座標を取得
     /// </summary>
-    private Vector3[] UpdateVertices(Vector3[] Vertices)
+    private Vector3[] GetMeshVertices(GameObject meshObject)
     {
-        for (int i = 0; i < Vertices.Length; i++)
-        {
-            Vertices[i] = Caster.transform.position + initVertices[i];
+        // 頂点情報（相対座標）取得
+        Vector3[] vertices;
+        vertices = meshObject.GetComponent<MeshFilter>().mesh.vertices.Distinct().ToArray();
+
+        // 各頂点を絶対座標に変換
+        Matrix4x4 casterLocalToWorld = meshObject.transform.localToWorldMatrix;      
+        for (int i = 0; i < vertices.Length; i++) {
+            vertices[i] = casterLocalToWorld.MultiplyPoint3x4(vertices[i]);
         }
-        return Vertices;
+        return vertices;
+    }
+
+    /// <summary>
+    /// 各頂点の座標を更新
+    /// </summary>
+    private Vector3[] UpdateVertices(GameObject meshObject, Vector3[] vertices, Matrix4x4 prevMatrix)
+    {
+        // 頂点の座標は 現在の変換行列 * 前の状態の変換行列の逆行列 で求まる
+        Matrix4x4 updateMatrix = meshObject.transform.localToWorldMatrix * prevMatrix.inverse;
+        for (int i = 0; i < vertices.Length; i++) {
+            vertices[i] = updateMatrix.MultiplyPoint3x4(vertices[i]);
+        }
+        return vertices;
     }
 
     /// <summary>
     /// 影の頂点座標を更新
     /// </summary>
-    private Vector3[] UpdateShadowVertices(Vector3[] Vertices)
+    private Vector3[] UpdateShadowVertices(Vector3[] castVertices)
     {
-        Vector3[] hitPoints = new Vector3[Vertices.Length];
-        for (int i = 0; i < Vertices.Length; i++)
+        Vector3[] hitPoints = new Vector3[castVertices.Length];
+        for (int i = 0; i < castVertices.Length; i++)
         {
             RaycastHit hit;
-            if (Physics.Raycast(Vertices[i], lightAngles, out hit)) hitPoints[i] = hit.point;
+            if (Physics.Raycast(castVertices[i], lightAngles, out hit)) hitPoints[i] = hit.point;
         }
         return hitPoints;
     }
