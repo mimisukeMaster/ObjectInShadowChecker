@@ -58,13 +58,13 @@ public class ShadowHideManager : MonoBehaviour
         lightAngles = Light.transform.forward;
 
         // 影を落とす物体の頂点情報（相対座標）取得
-        casterVertices = Caster.GetComponent<MeshFilter>().mesh.vertices.ToArray().Distinct().ToArray();
+        casterVertices = Caster.GetComponent<MeshFilter>().mesh.vertices.Distinct().ToArray();
         // 各頂点の相対座標を保存
         initVertices = new Vector3[casterVertices.Length];
         for (int i = 0; i < casterVertices.Length; i++) initVertices[i] = casterVertices[i];
 
         // ターゲットの頂点情報を取得し絶対座標に修正
-        targetVertices = Target.GetComponent<MeshFilter>().mesh.vertices.ToArray().Distinct().ToArray();
+        targetVertices = Target.GetComponent<MeshFilter>().mesh.vertices.Distinct().ToArray();
         for (int i = 0; i < targetVertices.Length; i++) {
             targetVertices[i] += Target.transform.position;
         }
