@@ -78,18 +78,21 @@ public class ShadowHideManager : MonoBehaviour
         
         // 影を落とす物体の頂点座標を更新
         casterVertices = UpdateVertices(Caster, casterVertices, casterTempMatrix);
-        for (int i = 0; i < casterVertices.Length -1; i++){
+        for (int i = 0; i < casterVertices.Length -1; i++)
+        {
             Debug.DrawLine(casterVertices[i], casterVertices[i+1], Color.cyan);
         }
         // 影の頂点座標を更新
         shadowVertices = UpdateShadowVertices(casterVertices);
-        for (int i = 0; i < shadowVertices.Length -1; i++){
+        for (int i = 0; i < shadowVertices.Length -1; i++)
+        {
             Debug.DrawLine(shadowVertices[i], shadowVertices[i+1], Color.red);
         }
 
         // 凸包を求める
         convexVertices = FindConvexHull(shadowVertices);
-        for (int i = 0; i < convexVertices.Length -1; i++){
+        for (int i = 0; i < convexVertices.Length -1; i++)
+        {
             Debug.DrawLine(convexVertices[i], convexVertices[i+1], Color.green);
         }
 
@@ -113,11 +116,8 @@ public class ShadowHideManager : MonoBehaviour
         vertices = meshObject.GetComponent<MeshFilter>().mesh.vertices.Distinct().ToArray();
 
         // 各頂点を絶対座標に変換
-        Matrix4x4 casterLocalToWorld = meshObject.transform.localToWorldMatrix;      
-        for (int i = 0; i < vertices.Length; i++) {
-            vertices[i] = casterLocalToWorld.MultiplyPoint3x4(vertices[i]);
-        }
-        return vertices;
+        Matrix4x4 casterLocalToWorld = meshObject.transform.localToWorldMatrix;
+        return TransformVertices(vertices, casterLocalToWorld);
     }
 
     /// <summary>
@@ -127,11 +127,23 @@ public class ShadowHideManager : MonoBehaviour
     {
         // 頂点の座標は 現在の変換行列 * 前の状態の変換行列の逆行列 で求まる
         Matrix4x4 updateMatrix = meshObject.transform.localToWorldMatrix * prevMatrix.inverse;
-        for (int i = 0; i < vertices.Length; i++) {
-            vertices[i] = updateMatrix.MultiplyPoint3x4(vertices[i]);
+        return TransformVertices(vertices, updateMatrix);
+    }
+
+    /// <summary>
+    /// 与えられた行列で各頂点の座標を変換
+    /// </summary>
+    /// <param name="vertices"></param>
+    /// <returns></returns>
+    private Vector3[] TransformVertices(Vector3[] vertices, Matrix4x4 matrix)
+    {
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            vertices[i] = matrix.MultiplyPoint3x4(vertices[i]);
         }
         return vertices;
     }
+
 
     /// <summary>
     /// 影の頂点座標を更新
@@ -216,7 +228,8 @@ public class ShadowHideManager : MonoBehaviour
     private bool IsVerticesInside(Vector3[] verticesToCheck, Vector3[] convexVertices)
     {
         bool isInside;
-        for (int i = 0; i < verticesToCheck.Length; i++) {
+        for (int i = 0; i < verticesToCheck.Length; i++)
+        {
             isInside = IsPointInside(verticesToCheck[i], convexVertices);
             if (!isInside) return false;
         }
