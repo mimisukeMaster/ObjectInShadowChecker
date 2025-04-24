@@ -31,12 +31,17 @@ public class ShadowHideManager : MonoBehaviour
     /// <summary>
     /// 影を落とす物体の座標の一時保存用
     /// </summary>
-    private Vector3 casterTempVector;
+    private Vector3 casterTempPosition;
 
     /// <summary>
     /// 影を落とす物体の回転の一時保存用
     /// </summary>
     private Quaternion casterTempQuaternion;
+
+    /// <summary>
+    /// 影を落とす物体のスケールの一時保存用
+    /// </summary>
+    private Vector3 casterTempScale;
 
     /// <summary>
     /// 影を落とす物体の頂点座標の変換行列の一時保存用
@@ -65,33 +70,34 @@ public class ShadowHideManager : MonoBehaviour
 
         shadowVertices = new Vector3[casterVertices.Length];
 
-        casterTempVector = Caster.transform.position;
+        casterTempPosition = Caster.transform.position;
         casterTempQuaternion = Caster.transform.rotation;
+        casterTempScale = Caster.transform.lossyScale;
         casterTempMatrix = Caster.transform.localToWorldMatrix;
     }
 
     private void Update()
     {
         // 座標・回転変更時でなければ何もしない
-        if (casterTempVector == Caster.transform.position &&
-                casterTempQuaternion == Caster.transform.rotation || Time.frameCount == 1) return;
+        if (casterTempPosition == Caster.transform.position && casterTempQuaternion == Caster.transform.rotation
+            && casterTempScale == Caster.transform.lossyScale && Time.frameCount != 1) return;
         
         // 影を落とす物体の頂点座標を更新
         casterVertices = UpdateVertices(Caster, casterVertices, casterTempMatrix);
-        for (int i = 0; i < casterVertices.Length -1; i++)
+        for (int i = 0; i < casterVertices.Length - 1; i++)
         {
             Debug.DrawLine(casterVertices[i], casterVertices[i+1], Color.cyan);
         }
         // 影の頂点座標を更新
         shadowVertices = UpdateShadowVertices(casterVertices);
-        for (int i = 0; i < shadowVertices.Length -1; i++)
+        for (int i = 0; i < shadowVertices.Length - 1; i++)
         {
             Debug.DrawLine(shadowVertices[i], shadowVertices[i+1], Color.red);
         }
 
         // 凸包を求める
         convexVertices = FindConvexHull(shadowVertices);
-        for (int i = 0; i < convexVertices.Length -1; i++)
+        for (int i = 0; i < convexVertices.Length - 1; i++)
         {
             Debug.DrawLine(convexVertices[i], convexVertices[i+1], Color.green);
         }
@@ -101,8 +107,9 @@ public class ShadowHideManager : MonoBehaviour
 
         print(isHide);
 
-        casterTempVector = Caster.transform.position;
+        casterTempPosition = Caster.transform.position;
         casterTempQuaternion = Caster.transform.rotation;
+        casterTempScale = Caster.transform.lossyScale;
         casterTempMatrix = Caster.transform.localToWorldMatrix;
     }
 
