@@ -4,6 +4,9 @@
 ```
 unity6000.0.26f
 ```
+## Demo
+<!-- sample movie -->
+
 
 ## How to calculate
 概略
@@ -13,5 +16,11 @@ unity6000.0.26f
 4. Sの各頂点座標（`y = 0`に固定）が全て凸包の内部に存在するなら、Sはその物体の影に隠れていると判定される
 
 ## Reference
-- 凸包を求めるアルゴリズム、内外判定
-https://tech-deliberate-jiro.com/convex-hull/
+- 凸包を求めるアルゴリズム、内外判定<br>
+  https://tech-deliberate-jiro.com/convex-hull/
+
+## Author
+ みみすけ名人 mimisukeMaster<br>
+
+ [<img src="https://img.shields.io/badge/-X-X.svg?style=flat-square&logo=X&logoColor=white&color=black">](https://x.com/mimisukeMaster)
+[<img src="https://img.shields.io/badge/-ArtStation-artstation.svg?&style=flat-square&logo=artstation&logoColor=blue&color=gray">](https://www.artstation.com/mimisukemaster)

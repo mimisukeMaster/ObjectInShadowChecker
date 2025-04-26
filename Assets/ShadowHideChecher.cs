@@ -78,7 +78,7 @@ public class ShadowHideManager : MonoBehaviour
 
     private void Update()
     {
-        // 座標・回転変更時でなければ何もしない
+        // 座標・回転・大きさ変更時でなければ何もしない
         if (casterTempPosition == Caster.transform.position && casterTempQuaternion == Caster.transform.rotation
             && casterTempScale == Caster.transform.lossyScale && Time.frameCount != 1) return;
         
